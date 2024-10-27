@@ -10,3 +10,11 @@ export type RegularMessage = {
   text: string;
   senderUUID: string;
 };
+
+export type RegistrationMessage = {
+  type: string;
+  data: {
+    name: string,
+    password: string
+  }
+};

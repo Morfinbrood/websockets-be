@@ -1,7 +1,7 @@
 import WebSocket from "ws";
-import { IncomingMessage, ServerResponse } from "http";
-import { JoinMessage, RegularMessage } from "../types/types";
+import { RegistrationMessage } from "../types/types";
 import { GroupConnections } from "../intefaces/interfaces";
+import memoryDb from "../db/memoryDB";
 
 export class MessageService {
     private static instance: MessageService;
@@ -16,17 +16,15 @@ export class MessageService {
         return MessageService.instance;
     }
 
-    public handleSocketMessage(ws: WebSocket, messageData: JoinMessage | RegularMessage) {
+    public handleSocketMessage(ws: WebSocket, messageData: RegistrationMessage) {
         let messageParsed = JSON.parse(messageData.toString());
-        const { senderUUID, type } = messageParsed;
+        const { type, data } = messageParsed;
+
         switch (type) {
-            case "join":
-                const { groupId } = messageParsed;
-                this.handleJoinMessage(groupId, senderUUID, ws);
-                break;
-            case "message":
-                const { groupIds, text } = messageParsed;
-                this.handleRegularMessage(groupIds, text, senderUUID);
+            case "reg":
+                const parsedData = JSON.parse(data);
+                this.handleRegistration(parsedData, ws);
+                console.log('reg message handler');
                 break;
             default:
                 console.log("Unknown message type");
@@ -34,73 +32,89 @@ export class MessageService {
         }
     }
 
-    public joinGroup(groupId: string, ws: WebSocket, uuid: string) {
-        console.log(`join client uuid: ${uuid} to groupId: ${groupId}`);
-        if (!this.groupConnections[groupId]) {
-            this.groupConnections[groupId] = [];
-        }
-        this.groupConnections[groupId].push({ client: ws, uuid: uuid });
-    }
+    private handleRegistration(data: { name: string, password: string }, ws: WebSocket) {
+        const { name, password } = data;
+        const existingUser = memoryDb.getUserByName(name);
+        let response;
 
-    public handleHTTPMessage(body: any, res: ServerResponse) {
-        const { groupIds, text, senderUUID } = body;
-        this.handleRegularMessage(groupIds, text, senderUUID);
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ status: "success" }));
-    }
-
-    private handleJoinMessage(groupId: string, senderUUID: string, ws: WebSocket) {
-        this.joinGroup(groupId, ws, senderUUID);
-    }
-
-    private handleRegularMessage(groupIds: string[], text: string, senderUUID: string) {
-        if (groupIds && groupIds.length > 0) {
-            this.sendMessageToAllSenderGroupsOnce(groupIds, text, senderUUID);
+        if (existingUser) {
+            response = {
+                type: "reg",
+                data: JSON.stringify({
+                    name: existingUser.name,
+                    index: existingUser.index,
+                    error: true,
+                    errorText: "User already registered."
+                }),
+                id: 0,
+            };
         } else {
-            console.log("No groupIds provided");
+            console.log(`try to add new user name: ${name} pass: ${password}`)
+            const newUser = memoryDb.addUser(name, password);
+            console.log(`Registered new user: ${JSON.stringify(newUser)}`);
+            response = {
+                type: "reg",
+                data: JSON.stringify({
+                    name: newUser.name,
+                    index: newUser,
+                    error: false,
+                    errorText: "",
+                }),
+                id: 0,
+            };
         }
+
+        ws.send(JSON.stringify(response));
     }
 
-    public sendMessageToAllSenderGroupsOnce(groupIds: string[], text: string, senderUUID: string) {
-        const uniqueReceiversUUIDs = this.getUniqueReceiversFromAllSenderGroupsExceptSender(groupIds, senderUUID);
-        uniqueReceiversUUIDs.forEach((receiverUUID: string) => {
-            this.sendMessageToOnlineReceivers(receiverUUID, text, senderUUID);
-        });
-    }
+    // public joinGroup(groupId: string, ws: WebSocket, uuid: string) {
+    //     console.log(`join client uuid: ${uuid} to groupId: ${groupId}`);
+    //     if (!this.groupConnections[groupId]) {
+    //         this.groupConnections[groupId] = [];
+    //     }
+    //     this.groupConnections[groupId].push({ client: ws, uuid: uuid });
+    // }
 
-    private getUniqueReceiversFromAllSenderGroupsExceptSender(groupIds: string[], senderUUID: string): Set<string> {
-        const uniqueReceiversUUIDs: Set<string> = new Set();
+    // public sendMessageToAllSenderGroupsOnce(groupIds: string[], text: string, senderUUID: string) {
+    //     const uniqueReceiversUUIDs = this.getUniqueReceiversFromAllSenderGroupsExceptSender(groupIds, senderUUID);
+    //     uniqueReceiversUUIDs.forEach((receiverUUID: string) => {
+    //         this.sendMessageToOnlineReceivers(receiverUUID, text, senderUUID);
+    //     });
+    // }
 
-        groupIds.forEach((groupId) => {
-            const connections = this.groupConnections[groupId] || [];
-            connections.forEach((clientInfo) => {
-                if (clientInfo.uuid !== senderUUID) {
-                    uniqueReceiversUUIDs.add(clientInfo.uuid);
-                }
-            });
-        });
+    // private getUniqueReceiversFromAllSenderGroupsExceptSender(groupIds: string[], senderUUID: string): Set<string> {
+    //     const uniqueReceiversUUIDs: Set<string> = new Set();
 
-        return uniqueReceiversUUIDs;
-    }
+    //     groupIds.forEach((groupId) => {
+    //         const connections = this.groupConnections[groupId] || [];
+    //         connections.forEach((clientInfo) => {
+    //             if (clientInfo.uuid !== senderUUID) {
+    //                 uniqueReceiversUUIDs.add(clientInfo.uuid);
+    //             }
+    //         });
+    //     });
 
-    private sendMessageToOnlineReceivers(receiverUUID: string, text: string, senderUUID: string) {
-        const wsClient = this.getSocketClientByUuid(receiverUUID, this.groupConnections);
-        if (!wsClient) return;
+    //     return uniqueReceiversUUIDs;
+    // }
 
-        if (wsClient.readyState !== WebSocket.OPEN) return;
+    // private sendMessageToOnlineReceivers(receiverUUID: string, text: string, senderUUID: string) {
+    //     const wsClient = this.getSocketClientByUuid(receiverUUID, this.groupConnections);
+    //     if (!wsClient) return;
 
-        const messageSending = {
-            type: "message",
-            text: text,
-        };
-        console.log(`sendMessageToOnlineReceivers: text: ${text} receiverUUID: ${receiverUUID}  senderUUID: ${senderUUID}`);
-        wsClient.send(JSON.stringify(messageSending));
-    }
+    //     if (wsClient.readyState !== WebSocket.OPEN) return;
 
-    private getSocketClientByUuid(uuid: string, groupConnections: GroupConnections) {
-        const [wsSocketClient] = Object.values(groupConnections)
-            .flat()
-            .filter((client) => client.uuid === uuid);
-        return wsSocketClient?.client;
-    }
+    //     const messageSending = {
+    //         type: "message",
+    //         text: text,
+    //     };
+    //     console.log(`sendMessageToOnlineReceivers: text: ${text} receiverUUID: ${receiverUUID}  senderUUID: ${senderUUID}`);
+    //     wsClient.send(JSON.stringify(messageSending));
+    // }
+
+    // private getSocketClientByUuid(uuid: string, groupConnections: GroupConnections) {
+    //     const [wsSocketClient] = Object.values(groupConnections)
+    //         .flat()
+    //         .filter((client) => client.uuid === uuid);
+    //     return wsSocketClient?.client;
+    // }
 }

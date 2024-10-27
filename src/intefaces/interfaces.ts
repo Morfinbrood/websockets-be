@@ -27,3 +27,9 @@ export interface IMessageService {
     handleRegularMessage(messageParsed: RegularMessage): void;
     sendMessageToAllSenderGroupsOnce(groupIds: string[], text: string, senderUUID: string): void;
 }
+
+export interface User {
+    index: number;
+    name: string;
+    password: string;
+}
