@@ -42,7 +42,6 @@ export class MessageService {
         this.groupConnections[groupId].push({ client: ws, uuid: uuid });
     }
 
-    // Обработка HTTP-запроса без Express
     public handleHTTPMessage(body: any, res: ServerResponse) {
         const { groupIds, text, senderUUID } = body;
         this.handleRegularMessage(groupIds, text, senderUUID);

@@ -8,7 +8,6 @@ export default function messageRoutes(req: IncomingMessage, res: ServerResponse,
     if (req.method === "POST" && req.url === "/sendHTTPMessage") {
         let body = "";
 
-        // Чтение тела запроса
         req.on("data", (chunk) => {
             body += chunk;
         });
@@ -18,7 +17,6 @@ export default function messageRoutes(req: IncomingMessage, res: ServerResponse,
                 const parsedBody = JSON.parse(body);
                 console.log(`POST /sendHTTPMessage req.body: ${parsedBody}`);
 
-                // Передача сообщения в messageService для обработки
                 messageService.handleHTTPMessage(parsedBody, res);
             } catch (error) {
                 console.error("Ошибка при разборе тела запроса:", error);
@@ -27,7 +25,6 @@ export default function messageRoutes(req: IncomingMessage, res: ServerResponse,
             }
         });
     } else {
-        // Если URL не совпадает, возвращаем 404
         res.writeHead(404, { "Content-Type": "text/plain" });
         res.end("Not Found");
     }
