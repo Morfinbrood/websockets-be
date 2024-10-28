@@ -48,10 +48,8 @@ class GameController {
                 }
             });
 
-            // Используем result.currentPlayer, чтобы передать ID следующего игрока после промаха
-            if (result.status === "miss") {
-                this.sendTurnUpdate(gameId, result.currentPlayer);
-            }
+            const currentTurnPlayer = GameService.getCurrentPlayer(gameId)
+            this.sendTurnUpdate(gameId, currentTurnPlayer);
         }
     }
 
@@ -61,6 +59,7 @@ class GameController {
             gameState.turnOrder.forEach(id => {
                 const playerWs = UserConnections.getWs(id);
                 if (playerWs) {
+                    console.log(`sendTurnUpdate     ${currentPlayer}`)
                     playerWs.send(JSON.stringify({
                         type: "turn",
                         data: JSON.stringify({ currentPlayer }),

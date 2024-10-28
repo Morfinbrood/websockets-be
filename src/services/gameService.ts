@@ -47,6 +47,7 @@ class GameService {
     }
 
     public processAttack(gameId: number, playerId: number, x: number, y: number): { status: string, currentPlayer: number, position: { x: number, y: number } } | null {
+
         const game = RoomService.getGameState(gameId);
         if (!game) {
             console.log(`Game with ID ${gameId} not found`);
@@ -57,44 +58,45 @@ class GameService {
         const opponent = game.players.get(opponentId)!;
         const opponentGrid = game.grid.get(opponentId)!;
 
-        // if (this.hasAlreadyShot(opponent, x, y)) {
-        //     console.log(`Repeat shot at (${x}, ${y}) for game ${gameId}`);
+        // if (opponent.shots.has(`${x},${y}`)) {
+        //     console.log(`Repeated shot at (${x}, ${y}) - ignored`);
         //     return null;
         // }
 
         opponent.shots.add(`${x},${y}`);
         const hit = this.isHit(opponentGrid, x, y);
 
-        let status;
+        let status: string;
         if (hit) {
             opponentGrid[y][x] = "X";
-            const hitShip = opponent.ships.find(ship => this.isHit(opponentGrid, x, y));
-            if (hitShip) hitShip.hits += 1;
-
-            status = hitShip && hitShip.hits === hitShip.length ? "killed" : "shot";
-
+            status = "shot";
             if (status === "killed" && this.isGameOver(opponent)) {
                 RoomService.endGame(game.idGame);
             }
-
         } else {
             opponentGrid[y][x] = "~";
-            status = 'miss';
-
+            status = "miss";
             this.changeTurnToOpponent(game, opponentId);
-
-            console.log(`Miss by Player ${playerId}. Next turn: Player ${opponentId}`);
         }
 
-        console.log(`Updated grid after hit by Player ${playerId}:  resulst HIT is ${status}`);
+        console.log(`Updated grid for Player ${opponentId} after attack by Player ${playerId} at (${x}, ${y}):`);
         this.printGrid(opponentGrid);
+
         return { status, currentPlayer: playerId, position: { x, y } };
     }
-
     private changeTurnToOpponent(game: GameState, opponentId: number): void {
+        console.log(`changeTurnToOpponent from current ${game.currentPlayer} to opponent ${opponentId}`)
         game.currentPlayer = opponentId;
     }
 
+    public getCurrentPlayer(gameId: number): number {
+        const game = RoomService.getGameState(gameId);
+        if (!game) {
+            console.log(`Game with ID ${gameId} not found`);
+            return -1;
+        }
+        return game.currentPlayer;
+    }
 
     private getOpponentId(game: GameState, playerId: number): number {
         return game.turnOrder.find(id => id !== playerId)!;
