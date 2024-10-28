@@ -28,14 +28,14 @@ class GameService {
         });
 
         game.players.get(indexPlayer)!.ships = ships;
-        console.log(`Game ${gameId} - Player ${indexPlayer}'s grid:`);
+        console.log(`Game ${gameId} - Player ${indexPlayer}\'s grid:`);
         this.printGrid(grid);
     }
 
     private printGrid(grid: string[][]): void {
         let gridOutput = "  0 1 2 3 4 5 6 7 8 9\n";
         grid.forEach((row, rowIndex) => {
-            const rowString = row.map(cell => (cell === "S" || cell === "X" || cell === "~") ? cell : "O").join(" ");
+            const rowString = row.map(cell => (cell === "S" || cell === "X" || cell === "~" || cell === "#") ? cell : "O").join(" ");
             gridOutput += `${rowIndex} ${rowString}\n`;
         });
         console.log(gridOutput);
@@ -46,7 +46,6 @@ class GameService {
     }
 
     public processAttack(gameId: number, playerId: number, x: number, y: number): { status: string, currentPlayer: number, position: { x: number, y: number } } | null {
-
         const game = RoomService.getGameState(gameId);
         if (!game) {
             console.log(`Game with ID ${gameId} not found`);
@@ -57,20 +56,19 @@ class GameService {
         const opponent = game.players.get(opponentId)!;
         const opponentGrid = game.grid.get(opponentId)!;
 
-        // if (opponent.shots.has(`${x},${y}`)) {
-        //     console.log(`Repeated shot at (${x}, ${y}) - ignored`);
-        //     return null;
-        // }
-
         opponent.shots.add(`${x},${y}`);
         const hit = this.isHit(opponentGrid, x, y);
 
         let status: string;
         if (hit) {
             opponentGrid[y][x] = "X";
-            status = "shot";
-            if (status === "killed" && this.isGameOver(opponent)) {
-                RoomService.endGame(game.idGame);
+            const ship = this.checkIfShipKilled(opponentGrid, x, y, opponent.ships);
+            if (ship) {
+                status = "killed";
+                this.markKilledShip(opponentGrid, ship);
+                this.markSurroundingKilledShipCellsAsMiss(opponentGrid, ship);
+            } else {
+                status = "shot";
             }
         } else {
             opponentGrid[y][x] = "~";
@@ -83,15 +81,72 @@ class GameService {
 
         return { status, currentPlayer: playerId, position: { x, y } };
     }
+
+    private checkIfShipKilled(grid: string[][], x: number, y: number, ships: Ship[]): Ship | null {
+        for (const ship of ships) {
+            const { position } = ship;
+            const isSunk = ship.direction
+                ? Array.from({ length: ship.length }).every((_, i) => grid[position.y + i][position.x] === "X")
+                : Array.from({ length: ship.length }).every((_, i) => grid[position.y][position.x + i] === "X");
+
+            if (isSunk) {
+                return ship;
+            }
+        }
+        return null;
+    }
+
+    private markKilledShip(grid: string[][], ship: Ship): void {
+        const { position } = ship;
+        for (let i = 0; i < ship.length; i++) {
+            if (ship.direction) { // Вертикальная ориентация
+                grid[position.y + i][position.x] = "#"; // Пометка убитого корабля
+            } else { // Горизонтальная ориентация
+                grid[position.y][position.x + i] = "#"; // Пометка убитого корабля
+            }
+        }
+    }
+
+    private markSurroundingKilledShipCellsAsMiss(grid: string[][], ship: Ship): void {
+        // Направления для проверки всех клеток вокруг каждого сегмента корабля
+        const directions = [
+            { dx: -1, dy: -1 }, { dx: 0, dy: -1 }, { dx: 1, dy: -1 },
+            { dx: -1, dy: 0 }, { dx: 1, dy: 0 },
+            { dx: -1, dy: 1 }, { dx: 0, dy: 1 }, { dx: 1, dy: 1 },
+        ];
+
+        // Проходим по каждому сегменту корабля
+        for (let i = 0; i < ship.length; i++) {
+            const segmentX = ship.direction ? ship.position.x : ship.position.x + i;
+            const segmentY = ship.direction ? ship.position.y + i : ship.position.y;
+
+            // Проверяем и помечаем клетки вокруг текущего сегмента
+            for (const { dx, dy } of directions) {
+                const newX = segmentX + dx;
+                const newY = segmentY + dy;
+                if (this.isWithinBounds(newX, newY, grid.length, grid[0].length)) {
+                    // Помечаем как "miss" только пустые клетки
+                    if (grid[newY][newX] === "O") {
+                        grid[newY][newX] = "~";
+                    }
+                }
+            }
+        }
+    }
+
+    private isWithinBounds(x: number, y: number, maxRows: number, maxCols: number): boolean {
+        return x >= 0 && x < maxCols && y >= 0 && y < maxRows;
+    }
+
     private changeTurnToOpponent(game: GameState, opponentId: number): void {
-        console.log(`changeTurnToOpponent from current ${game.currentPlayer} to opponent ${opponentId}`)
+        console.log(`changeTurnToOpponent from current ${game.currentPlayer} to opponent ${opponentId}`);
         game.currentPlayer = opponentId;
     }
 
     public getCurrentPlayer(gameId: number): number {
         const game = RoomService.getGameState(gameId);
         if (!game) {
-            console.log(`Game with ID ${gameId} not found`);
+            console.log(`Game with ID ${gameId} not found.`);
             return -1;
         }
         return game.currentPlayer;
@@ -99,14 +154,6 @@ class GameService {
 
     private getOpponentId(game: GameState, playerId: number): number {
         return game.turnOrder.find(id => id !== playerId)!;
-    }
-
-    private hasAlreadyShot(opponent: any, x: number, y: number): boolean {
-        return opponent.shots.has(`${x},${y}`);
-    }
-
-    private isGameOver(opponent: any): boolean {
-        return opponent.ships.every((ship: { hits: any; length: any; }) => ship.hits === ship.length);
     }
 
     private isHit(grid: string[][], x: number, y: number): boolean {
