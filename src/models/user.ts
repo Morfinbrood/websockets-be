@@ -1,5 +1,5 @@
 export interface User {
-    index: string;
+    index: number;
     name: string;
     password: string;
 }
