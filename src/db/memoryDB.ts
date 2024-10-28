@@ -8,7 +8,6 @@ class MemoryDb {
         const index = this.users.length + 1;
         const newUser = { name, password, index };
         this.users.push(newUser);
-        console.log(`after added users : ${JSON.stringify(this.users)}`);
         return newUser;
     }
 
@@ -17,7 +16,6 @@ class MemoryDb {
     }
 
     public getUserByName(name: string): User | undefined {
-        console.log(`all users before findUserByName: ${JSON.stringify(this.users)}`);
         return this.users.find(user => user.name === name);
     }
 

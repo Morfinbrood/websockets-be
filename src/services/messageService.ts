@@ -1,8 +1,8 @@
-import WebSocket from "ws";
-import { Message } from "../models/message";
-import UserService from "./userService";
-import RoomService from "./roomService";
 import memoryDb from "../db/memoryDB";
+import WebSocket from "ws";
+import RoomService from "./roomService";
+import UserService from "./userService";
+import { Message } from "../models/message";
 
 export class MessageService {
     private static instance: MessageService;
@@ -21,18 +21,27 @@ export class MessageService {
     public handleSocketMessage(ws: WebSocket, messageData: Message) {
         const messageParsed = JSON.parse(messageData.toString());
         const { type, data } = messageParsed;
+        let parsedData;
+        if (data) { parsedData = JSON.parse(data); }
 
         switch (type) {
             case "reg":
-                const parsedData = JSON.parse(data);
                 this.handleRegistration(parsedData, ws);
                 break;
             case "create_room":
                 this.handleCreateRoom(ws);
                 break;
             case "add_user_to_room":
-                const roomData = JSON.parse(data);
-                this.handleAddUserToRoom(roomData.indexRoom, ws);
+                this.handleAddUserToRoom(parsedData.indexRoom, ws);
+                break;
+            case "add_ships":
+                this.handleAddShips(parsedData);
+                break;
+            case "attack":
+                this.handleAttack(parsedData, ws);
+                break;
+            case "randomAttack":
+                this.handleRandomAttack(parsedData, ws);
                 break;
             default:
                 console.log("Unknown message type");
@@ -47,7 +56,7 @@ export class MessageService {
         let response;
         if (user) {
             this.userConnections.set(ws, user.index);
-            this.wsConnections.set(user.index, ws); // associate userIndex and WebSocket
+            this.wsConnections.set(user.index, ws);
             response = {
                 type: "reg",
                 data: JSON.stringify({
@@ -139,6 +148,90 @@ export class MessageService {
                         id: 0,
                     };
                     playerWs.send(JSON.stringify(response));
+                }
+            });
+        }
+    }
+
+    private handleAddShips(data: any) {
+        const { gameId, ships, indexPlayer } = data;
+        const player = UserService.getUserByIndex(indexPlayer);
+        if (!player) return;
+
+        const isReady = RoomService.addShipsToGame(gameId, indexPlayer, ships);
+
+        if (isReady) {
+            const gameState = RoomService.getGameState(gameId);
+            if (gameState) {
+                gameState.turnOrder.forEach(id => {
+                    const playerWs = this.wsConnections.get(id);
+                    if (playerWs) {
+                        const playerShips = gameState.players.get(id)!.ships;
+                        playerWs.send(JSON.stringify({
+                            type: "start_game",
+                            data: JSON.stringify({ ships: playerShips, currentPlayerIndex: gameState.currentPlayer }),
+                            id: 0
+                        }));
+                    }
+                });
+                this.sendTurnUpdate(gameId, gameState.currentPlayer);
+            }
+        }
+    }
+
+
+    private handleAttack(data: any, ws: WebSocket) {
+        const { gameId, x, y, indexPlayer } = data;
+        const gameState = RoomService.getGameState(gameId);
+
+        if (!gameState || gameState.currentPlayer !== indexPlayer) {
+            console.log(`Player ${indexPlayer} attempted to attack out of turn in game ${gameId}`);
+            return;
+        }
+
+        const result = RoomService.processAttack(gameId, indexPlayer, x, y);
+
+        if (result) {
+            gameState.turnOrder.forEach(id => {
+                const playerWs = this.wsConnections.get(id);
+                if (playerWs) {
+                    playerWs.send(JSON.stringify({
+                        type: "attack",
+                        data: JSON.stringify(result),
+                        id: 0,
+                    }));
+                }
+            });
+
+            if (result.status === "miss") {
+                this.sendTurnUpdate(gameId, result.currentPlayer);
+            }
+        }
+    }
+
+
+    private handleRandomAttack(data: any, ws: WebSocket) {
+        const { gameId, indexPlayer } = data;
+        const gameState = RoomService.getGameState(gameId);
+        if (!gameState) return;
+
+        const randomX = Math.floor(Math.random() * 10);
+        const randomY = Math.floor(Math.random() * 10);
+
+        this.handleAttack({ gameId, x: randomX, y: randomY, indexPlayer }, ws);
+    }
+
+    private sendTurnUpdate(gameId: number, currentPlayer: number) {
+        const gameState = RoomService.getGameState(gameId);
+        if (gameState) {
+            gameState.turnOrder.forEach(id => {
+                const playerWs = this.wsConnections.get(id);
+                if (playerWs) {
+                    playerWs.send(JSON.stringify({
+                        type: "turn",
+                        data: JSON.stringify({ currentPlayer }),
+                        id: 0,
+                    }));
                 }
             });
         }
