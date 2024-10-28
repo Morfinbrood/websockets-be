@@ -79,10 +79,10 @@ class GameService {
 
             console.log(`Updated grid after hit by Player ${playerId}:`);
         } else {
-            status = 'miss';
             opponentGrid[y][x] = "~";
+            status = 'miss';
 
-            this.changeTurn(game, opponentId);
+            this.changeTurnToOpponent(game, opponentId);
 
             console.log(`Miss by Player ${playerId}. Next turn: Player ${opponentId}`);
         }
@@ -90,7 +90,7 @@ class GameService {
         return { status, currentPlayer: playerId, position: { x, y } };
     }
 
-    private changeTurn(game: GameState, opponentId: number): void {
+    private changeTurnToOpponent(game: GameState, opponentId: number): void {
         game.currentPlayer = opponentId;
     }
 
