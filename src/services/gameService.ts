@@ -77,7 +77,6 @@ class GameService {
                 RoomService.endGame(game.idGame);
             }
 
-            console.log(`Updated grid after hit by Player ${playerId}:`);
         } else {
             opponentGrid[y][x] = "~";
             status = 'miss';
@@ -86,6 +85,8 @@ class GameService {
 
             console.log(`Miss by Player ${playerId}. Next turn: Player ${opponentId}`);
         }
+
+        console.log(`Updated grid after hit by Player ${playerId}:  resulst HIT is ${status}`);
         this.printGrid(opponentGrid);
         return { status, currentPlayer: playerId, position: { x, y } };
     }
