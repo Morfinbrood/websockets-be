@@ -1,24 +1,33 @@
+import { Ship } from "../models/ship";
+import gameService from "../services/gameService";
 import GameService from "../services/gameService";
 import RoomService from "../services/roomService";
 import UserConnections from "../services/userConnectionsService";
 
 class GameController {
-    public handleAddShips(gameId: number, indexPlayer: number, ships: any) {
-        const isReady = GameService.addShipsToGame(gameId, indexPlayer, ships);
+    public handleAddShips(gameId: number, indexPlayer: number, ships: Ship[]) {
+        let isBothReady;
+        GameService.addShipsToGame(gameId, indexPlayer, ships);
+        const game = RoomService.getGameState(gameId);
 
-        if (isReady) {
+        if (game) { isBothReady = gameService.isBothPlayersReady(game) }
+
+        if (isBothReady) {
             const gameState = RoomService.getGameState(gameId);
-            gameState?.turnOrder.forEach(id => {
-                const playerWs = UserConnections.getWs(id);
+
+            gameState?.players.forEach((player, playerId) => {
+                const playerWs = UserConnections.getWs(playerId);
                 if (playerWs) {
-                    const playerShips = gameState.grid.get(id)!;
+                    let playerShips = player.ships;
+
                     playerWs.send(JSON.stringify({
                         type: "start_game",
-                        data: JSON.stringify({ ships: playerShips, currentPlayerIndex: gameState.currentPlayer }),
+                        data: JSON.stringify({ ships: playerShips, currentPlayerIndex: playerId }),
                         id: 0
                     }));
                 }
             });
+
             this.sendTurnUpdate(gameId, gameState!.currentPlayer);
         }
     }

@@ -3,17 +3,18 @@ import { Ship } from "../models/ship";
 import RoomService from "./roomService";
 
 class GameService {
-    public addShipsToGame(gameId: number, playerId: number, ships: Ship[]): boolean {
+    public addShipsToGame(gameId: number, indexPlayer: number, ships: Ship[]): void {
         const game = RoomService.getGameState(gameId);
-        if (!game || !game.players.has(playerId)) {
-            console.log(`Game ${gameId} or player ${playerId} not found.`);
-            return false;
+
+        if (!game || !game.players.has(indexPlayer)) {
+            console.log(`Game ${gameId} or player ${indexPlayer} not found.`);
+            return;
         }
 
-        if (!game.grid.has(playerId)) {
-            game.grid.set(playerId, this.createEmptyGrid());
+        if (!game.grid.has(indexPlayer)) {
+            game.grid.set(indexPlayer, this.createEmptyGrid());
         }
-        const grid = game.grid.get(playerId)!;
+        const grid = game.grid.get(indexPlayer)!;
 
         ships.forEach(ship => {
             const { x, y } = ship.position;
@@ -26,11 +27,9 @@ class GameService {
             }
         });
 
-        game.players.get(playerId)!.ships = ships;
-        console.log(`Game ${gameId} - Player ${playerId}'s grid:`);
+        game.players.get(indexPlayer)!.ships = ships;
+        console.log(`Game ${gameId} - Player ${indexPlayer}'s grid:`);
         this.printGrid(grid);
-
-        return this.checkBothPlayersReady(game);
     }
 
     private printGrid(grid: string[][]): void {
@@ -42,7 +41,7 @@ class GameService {
         console.log(gridOutput);
     }
 
-    private checkBothPlayersReady(game: GameState): boolean {
+    public isBothPlayersReady(game: GameState): boolean {
         return Array.from(game.players.values()).every(player => player.ships.length > 0);
     }
 
