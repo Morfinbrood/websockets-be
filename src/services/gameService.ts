@@ -57,10 +57,10 @@ class GameService {
         const opponent = game.players.get(opponentId)!;
         const opponentGrid = game.grid.get(opponentId)!;
 
-        if (this.hasAlreadyShot(opponent, x, y)) {
-            console.log(`Repeat shot at (${x}, ${y}) for game ${gameId}`);
-            return null;
-        }
+        // if (this.hasAlreadyShot(opponent, x, y)) {
+        //     console.log(`Repeat shot at (${x}, ${y}) for game ${gameId}`);
+        //     return null;
+        // }
 
         opponent.shots.add(`${x},${y}`);
         const hit = this.isHit(opponentGrid, x, y);
