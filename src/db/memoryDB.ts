@@ -2,6 +2,11 @@ import { User } from "../models/user";
 
 class MemoryDb {
     private users: User[] = [];
+    private winners: {
+        name: string,
+        wins: number,
+    }[] = []
+
     private rooms: { [key: number]: User[] } = {};
 
     public addUser(name: string, password: string): User {
@@ -43,6 +48,19 @@ class MemoryDb {
 
     public getRooms(): { [key: number]: User[] } {
         return this.rooms;
+    }
+
+    public updateWinner(name: string): void {
+        const winner = this.winners.find(w => w.name === name);
+        if (winner) {
+            winner.wins += 1;
+        } else {
+            this.winners.push({ name, wins: 1 });
+        }
+    }
+
+    public getWinners(): { name: string, wins: number }[] {
+        return this.winners;
     }
 }
 

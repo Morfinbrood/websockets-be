@@ -5,6 +5,7 @@ import { createEmptyGrid, printGrid } from "../utils/gridUtils";
 import { sendKillFeedback, sendMissFeedback } from "./feedbackService";
 import { checkIfShipKilled, markKilledShip, markSurroundingKilledShipCellsAsMiss } from "../utils/shipUtils";
 import UserConnections from "../services/userConnectionsService";
+import memoryDb from "../db/memoryDB";
 
 class GameService {
     public addShipsToGame(gameId: number, indexPlayer: number, ships: Ship[]): void {
@@ -126,6 +127,11 @@ class GameService {
     private endGame(gameId: number, winnerId: number): void {
         const game = RoomService.getGameState(gameId);
         if (!game) return;
+
+        const winnerName = memoryDb.getUserByIndex(winnerId)?.name;
+        if (winnerName) {
+            memoryDb.updateWinner(winnerName);
+        }
 
         const message = {
             type: "finish",
