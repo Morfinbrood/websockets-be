@@ -1,3 +1,4 @@
+// roomService.ts
 import memoryDb from "../db/memoryDB";
 import { User } from "../models/user";
 import { GameState } from "../models/gameState";
@@ -32,15 +33,29 @@ class RoomService {
         if (room.length === 2) {
             const idGame = this.gameCounter++;
             const players = new Map<number, { ships: Ship[], shots: Set<string> }>();
+            const grids = new Map<number, string[][]>();
+
             room.forEach(player => {
                 players.set(player.index, { ships: [], shots: new Set() });
+                grids.set(player.index, this.createEmptyGrid()); // Инициализируем сетку для каждого игрока
             });
 
-            this.activeGames.set(idGame, { idGame, players, currentPlayer: room[0].index, turnOrder: [room[0].index, room[1].index] });
+            this.activeGames.set(idGame, {
+                idGame,
+                players,
+                currentPlayer: room[0].index,
+                turnOrder: [room[0].index, room[1].index],
+                grid: grids // добавляем инициализированную сетку
+            });
+
             return { idGame, idPlayer: user.index };
         }
 
         return null;
+    }
+
+    private createEmptyGrid(): string[][] {
+        return Array(10).fill(null).map(() => Array(10).fill("O"));
     }
 
     public getGameState(gameId: number): GameState | undefined {

@@ -6,8 +6,9 @@ export interface PlayerState {
 }
 
 export interface GameState {
-    idGame: number;                   // Идентификатор игры
-    players: Map<number, PlayerState>; // Карта состояний игроков, где ключ — идентификатор игрока
-    currentPlayer: number;            // Идентификатор текущего игрока, который делает ход
-    turnOrder: number[];              // Очередность ходов (массив идентификаторов игроков)
+    idGame: number;
+    players: Map<number, { ships: Ship[], shots: Set<string> }>;
+    currentPlayer: number;
+    turnOrder: number[];
+    grid: Map<number, string[][]>; // Добавляем свойство grid для каждого игрока
 }
