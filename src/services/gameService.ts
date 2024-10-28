@@ -4,6 +4,7 @@ import RoomService from "./roomService";
 import { createEmptyGrid, printGrid } from "../utils/gridUtils";
 import { sendKillFeedback, sendMissFeedback } from "./feedbackService";
 import { checkIfShipKilled, markKilledShip, markSurroundingKilledShipCellsAsMiss } from "../utils/shipUtils";
+import UserConnections from "../services/userConnectionsService";
 
 class GameService {
     public addShipsToGame(gameId: number, indexPlayer: number, ships: Ship[]): void {
@@ -63,6 +64,11 @@ class GameService {
 
                 sendKillFeedback(gameId, ship, playerId);
                 sendMissFeedback(gameId, ship, playerId);
+
+                if (this.isGameOver(opponentGrid)) {
+                    this.endGame(gameId, playerId);
+                    return null;
+                }
             } else {
                 status = "shot";
             }
@@ -77,7 +83,6 @@ class GameService {
 
         return { status, currentPlayer: playerId, position: { x, y } };
     }
-
     private changeTurnToOpponent(game: GameState, opponentId: number): void {
         console.log(`changeTurnToOpponent from current ${game.currentPlayer} to opponent ${opponentId}`);
         game.currentPlayer = opponentId;
@@ -107,6 +112,35 @@ class GameService {
             return -1;
         }
         return game.currentPlayer;
+    }
+
+    private isGameOver(opponentGrid: string[][]): boolean {
+        for (const row of opponentGrid) {
+            if (row.includes("S")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private endGame(gameId: number, winnerId: number): void {
+        const game = RoomService.getGameState(gameId);
+        if (!game) return;
+
+        const message = {
+            type: "finish",
+            data: JSON.stringify({
+                winPlayer: winnerId,
+            }),
+            id: 0,
+        };
+
+        game.turnOrder.forEach(playerId => {
+            const playerWs = UserConnections.getWs(playerId);
+            if (playerWs) {
+                playerWs.send(JSON.stringify(message));
+            }
+        });
     }
 }
 
